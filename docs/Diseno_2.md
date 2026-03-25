@@ -1,32 +1,34 @@
 # Manual de Programación: Ejercicio 2 - Gestión de Museo
+
 ## 1. Requerimientos Funcionales
-Gestión de Inventario de Arte: Registro detallado de obras incluyendo cuadros, esculturas y otros objetos. Atributos base: título, autor, valor económico, fecha de creación y fecha de entrada al museo.
 
-Clasificación Especializada:Cuadros: Registro de técnica (óleo, acuarela, etc.) y estilo.
+Gestión de Catálogo: Registro de cuadros, esculturas y objetos con autor, periodo, valor y fechas clave.
 
-Esculturas: Registro de material (mármol, bronce, etc.) y estilo.
+Proceso de Restauración: Control de obras en exposición vs. restauración. Incluye alertas automáticas cada 5 años.
 
-Trazabilidad de Restauraciones: Registro histórico de intervenciones incluyendo tipo de restauración, fecha de inicio y fecha de finalización.
+Gestión de Cesiones: Listado de museos colaboradores, control de importes de cesión y cola de espera para obras solicitadas.
 
-Gestión de Convenios: Control de obras cedidas por o a otros museos, registrando el nombre del museo colaborador, periodo de cesión e importe económico.
+Consultas Especializadas: * Restaurador Jefe: Historial de restauraciones ordenado por antigüedad.
 
-Consultas por Perfil:Visitantes: Consulta de listados de obras organizados por salas.
+Director: Valoración económica total del patrimonio.
 
-Director: Consulta de la valoración económica total de toda la colección.
-
-Sistema de Seguridad: Autenticación obligatoria para todos los usuarios antes de acceder a cualquier funcionalidad.
+Visitante: Listado de obras por salas en monitor de vestíbulo.
 
 ## 2. Reglas de Negocio
 
-Alerta de Mantenimiento Preventivo: El sistema debe generar una alerta automática si han transcurrido 5 años desde la fecha de entrada de la obra al museo o desde su última restauración.
+Mantenimiento Preventivo: Las obras se restauran automáticamente cada 5 años ($t \geq 1825$ días).
 
-Control de Acceso: No se permiten consultas o registros anónimos; la identidad del usuario determina los privilegios de visualización.
+Restauración de Emergencia: Envío inmediato si la obra resulta dañada.
+
+Prioridad de Cesión: Si una obra cedida es solicitada, se encola para el siguiente museo al finalizar el periodo actual.
 
 ## 3. Integración y Restricciones Técnicas
 
-Jerarquía de Clases: Uso de herencia para especializar obras (Cuadro/Escultura) y usuarios (Director/Visitante).
+Persistencia: Uso de archivos CSV (catalogo_museo.csv, restauraciones.csv, usuarios_museo.csv).
 
-Persistencia: Uso de archivos `obras.csv` y `restauraciones.csv` para el almacenamiento de datos históricos.
+Seguridad: Autenticación obligatoria para todos los perfiles.
+
+Encapsulamiento: Protección de datos sensibles de usuarios y valoración económica.
 
 ## 4. Modelado Matemático
 
@@ -54,46 +56,60 @@ $$\text{EstadoAlerta} = \begin{cases} \text{Crítico (Mantenimiento Requerido)} 
 ## 5. Diagrama de Clases (UML)
 ```mermaid
 classDiagram
-    class Usuario {
-        <<Abstract>>
-        -string username
-        -string password
-        +autenticar(user, pass) bool
-    }
-    class Visitante { +consultarObrasPorSala() }
-    class Director { +consultarValoracionTotal() }
     class ObraDeArte {
-        <<Abstract>>
-        -date fechaEntrada
+        <<abstract>>
+        -string titulo
+        -string autor
+        -float valor
+        -date f_creacion
+        -date f_entrada
         +verificarMantenimiento() bool
     }
-    class Cuadro { -string tecnica }
-    class Escultura { -string material }
-    class Restauracion { -date fechaFin }
-    class MuseoColaborador { -float importeCesion }
 
-    Usuario <|-- Visitante
-    Usuario <|-- Director
+    class Cuadro {
+        -string tecnica
+        -string estilo
+    }
+
+    class Escultura {
+        -string material
+        -string estilo
+    }
+
+    class MuseoRepository {
+        +cargarObras() list
+        +registrarRestauracion(id)
+        +gestionarCesion(id, museo)
+    }
+
+    class UsuarioMuseo {
+        -string __password
+        -string rol
+        +validarAcceso()
+    }
+
     ObraDeArte <|-- Cuadro
     ObraDeArte <|-- Escultura
-    ObraDeArte "1" -- "*" Restauracion
-    ObraDeArte "*" -- "0..1" MuseoColaborador
+    MuseoRepository ..> ObraDeArte : gestiona
+    UsuarioMuseo ..> MuseoRepository : consulta según rol
+```    
 
 
 ## 6. Justificación del Diseño según Requerimientos
 
-El sistema utiliza Abstracción para definir la base de las obras, permitiendo que la lógica de mantenimiento sea heredada por cuadros y esculturas. La persistencia en CSV asegura que el historial de restauraciones se mantenga íntegro, permitiendo al método verificarMantenimiento calcular con precisión los tiempos de alerta
+El sistema de gestión de obras de arte se ha diseñado bajo una arquitectura robusta que prioriza la extensibilidad y el cumplimiento de las normativas del museo:
 
+Abstracción y Herencia: La clase ObraDeArte actúa como una base abstracta que centraliza los atributos comunes (autor, periodo, valor). Esto permite que el sistema cumpla con el Principio de Abierto/Cerrado (OCP), facilitando la adición de nuevos tipos de objetos artísticos en el futuro sin modificar la lógica existente de valoración o restauración.
 
-Generalización de Obras: Se utiliza ObraDeArte como clase abstracta para capturar los atributos comunes exigidos (título, autor, valor, fechas), permitiendo la especialización en Cuadro y Escultura.
+Polimorfismo en la Valoración Patrimonial: Gracias al polimorfismo, el Director del Museo (actuando como Super Usuario financiero) puede ejecutar el cálculo de la valoración total ($V_{total}$) iterando sobre una lista genérica de obras. El sistema procesa cuadros y esculturas uniformemente para obtener la suma económica requerida.
 
-Gestión de Seguridad: Se implementa una jerarquía de Usuario que garantiza que tanto el Director como el Visitante pasen por el proceso de autenticación requerido.
+Encapsulamiento de Lógica de Mantenimiento: La regla de negocio de los 5 años ($1825$ días) se ha encapsulado directamente en el método verificarMantenimiento() de la clase base. Esto asegura que el Restaurador Jefe reciba alertas automáticas basadas en un cálculo matemático preciso, independientemente del tipo de obra tratada.
 
-Historial de Restauraciones: Se modela como una relación 1:N entre la obra y la clase Restauracion, permitiendo almacenar múltiples intervenciones en el tiempo.
+Patrón Repository para Desacoplamiento: La clase MuseoRepository separa la lógica de negocio de la persistencia física en archivos CSV. Este desacoplamiento es vital para gestionar la trazabilidad de las restauraciones y las cesiones a otros museos, permitiendo que el estado de una obra cambie de "Expuesta" a "En Restauración" de manera íntegra.
 
-Lógica de Cesión: Se incluye la clase MuseoColaborador para cumplir con el requerimiento de registrar importes y periodos de obras que no pertenecen permanentemente al museo.
+Seguridad Basada en Roles: Se implementó una jerarquía de acceso mediante la clase UsuarioMuseo. Utilizando atributos privados para las credenciales, se garantiza que el Visitante acceda exclusivamente a la información pública del monitor, mientras que las funciones críticas de modificación del catálogo (Encargado) y gestión de importes de cesión (Director) queden protegidas.
 
-Alerta de 5 años: El método verificarMantenimiento() en la clase base utiliza la lógica matemática definida para disparar las alertas preventivas.
+Gestión de Cesiones y Colas: El diseño contempla la persistencia de estados para gestionar la prioridad de cesión. Si una obra está cedida, el sistema encola las solicitudes posteriores, asegurando que la gestión del Director sea fluida y respetuosa con los periodos de tiempo pactados.
 
 ## 7. Estándares de Calidad:
 
