@@ -67,9 +67,6 @@ classDiagram
         +remitirGerente()
     }
 
-    class GerenteRelaciones {
-        +recibirQueja(queja)
-    }
 
     Cliente "1" -- "*" OrdenCompra
     OrdenCompra "*" -- "*" Producto
@@ -77,7 +74,7 @@ classDiagram
     AgenteDeposito ..> InventarioExterno : actualiza CSV
     AgenteDeposito --> Logistica
     Cliente "1" -- "*" Queja
-    Queja ..> GerenteRelaciones
+    Queja ..> CSV : persiste en quejas.csv
 
 ```
 
