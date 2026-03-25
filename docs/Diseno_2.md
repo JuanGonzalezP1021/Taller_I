@@ -24,9 +24,9 @@ Control de Acceso: No se permiten consultas o registros anónimos; la identidad 
 
 ## 3. Integración y Restricciones Técnicas
 
-Jerarquía de Clases: Implementación de herencia para especializar los tipos de obras de arte y los roles de usuario.
+Jerarquía de Clases: Uso de herencia para especializar obras (Cuadro/Escultura) y usuarios (Director/Visitante).
 
-Abstracción de Datos: Uso de clases abstractas para definir la estructura base de las obras y los usuarios, impidiendo instancias incompletas.
+Persistencia: Uso de archivos `obras.csv` y `restauraciones.csv` para el almacenamiento de datos históricos.
 
 ## 4. Modelado Matemático
 
@@ -58,60 +58,33 @@ classDiagram
         <<Abstract>>
         -string username
         -string password
-        +autenticar(user, pass) bool*
+        +autenticar(user, pass) bool
     }
-
-    class Visitante {
-        +consultarObrasPorSala(sala)
-    }
-
-    class Director {
-        +consultarValoracionTotal(inventario) float
-    }
-
+    class Visitante { +consultarObrasPorSala() }
+    class Director { +consultarValoracionTotal() }
     class ObraDeArte {
         <<Abstract>>
-        -string titulo
-        -string autor
-        -float valor
-        -date fechaCreacion
         -date fechaEntrada
         +verificarMantenimiento() bool
     }
-
-    class Cuadro {
-        -string tecnica
-        -string estilo
-    }
-
-    class Escultura {
-        -string material
-        -string estilo
-    }
-
-    class Restauracion {
-        -string tipo
-        -date fechaInicio
-        -date fechaFin
-    }
-
-    class MuseoColaborador {
-        -string nombre
-        -string periodo
-        -float importeCesion
-    }
+    class Cuadro { -string tecnica }
+    class Escultura { -string material }
+    class Restauracion { -date fechaFin }
+    class MuseoColaborador { -float importeCesion }
 
     Usuario <|-- Visitante
     Usuario <|-- Director
     ObraDeArte <|-- Cuadro
     ObraDeArte <|-- Escultura
-    ObraDeArte "1" -- "*" Restauracion : posee historial
-    ObraDeArte "*" -- "0..1" MuseoColaborador : cedida por
-
-```
+    ObraDeArte "1" -- "*" Restauracion
+    ObraDeArte "*" -- "0..1" MuseoColaborador
 
 
 ## 6. Justificación del Diseño según Requerimientos
+
+El sistema utiliza Abstracción para definir la base de las obras, permitiendo que la lógica de mantenimiento sea heredada por cuadros y esculturas. La persistencia en CSV asegura que el historial de restauraciones se mantenga íntegro, permitiendo al método verificarMantenimiento calcular con precisión los tiempos de alerta
+
+
 Generalización de Obras: Se utiliza ObraDeArte como clase abstracta para capturar los atributos comunes exigidos (título, autor, valor, fechas), permitiendo la especialización en Cuadro y Escultura.
 
 Gestión de Seguridad: Se implementa una jerarquía de Usuario que garantiza que tanto el Director como el Visitante pasen por el proceso de autenticación requerido.
