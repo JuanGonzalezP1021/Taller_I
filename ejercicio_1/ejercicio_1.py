@@ -1,150 +1,142 @@
 import csv
 import datetime
+import os
 
-# --- CAPA DE PERSISTENCIA (REPOSITORIOS) ---
+# --- CAPA DE SEGURIDAD Y DATOS ---
+
+class Usuario:
+    def __init__(self, username, password, rol, email, suscripcion):
+        self.username = username
+        self.__password = password # Encapsulamiento
+        self.rol = rol
+        self.email = email
+        self.suscripcion = suscripcion
+
+    def validar_password(self, psw):
+        return self.__password == psw
+
+class UsuarioRepository:
+    @staticmethod
+    def login(user, psw):
+        if not os.path.exists('usuarios.csv'): return None
+        with open('usuarios.csv', mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                u = Usuario(row['username'], row['password'], row['rol'], row['email'], row['suscripcion'])
+                if u.username == user and u.validar_password(psw):
+                    return u
+        return None
+
+    @staticmethod
+    def cambiar_suscripcion(username, estado="SI"):
+        filas, ok = [], False
+        with open('usuarios.csv', mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            for row in reader:
+                if row['username'] == username:
+                    row['suscripcion'] = estado
+                    ok = True
+                filas.append(row)
+        if ok:
+            with open('usuarios.csv', mode='w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader(); writer.writerows(filas)
+        return ok
 
 class PedidoRepository:
     def __init__(self, archivo="pedidos.csv"):
         self.archivo = archivo
 
-    def registrar_pedido(self, numero, cliente, total):
-        with open(self.archivo, mode='a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            # Estado inicial: Pendiente | Transportadora: N/A
-            writer.writerow([numero, cliente, total, "Pendiente", "N/A"])
+    def crear(self, num, cliente, total):
+        with open(self.archivo, mode='a', newline='') as f:
+            csv.writer(f).writerow([num, cliente, total, "Confirmada", "N/A"])
 
-    def obtener_pendientes(self):
-        pendientes = []
-        with open(self.archivo, mode='r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row['estado'] == "Pendiente":
-                    pendientes.append(row)
-        return pendientes
+    def listar(self):
+        with open(self.archivo, mode='r') as f: return list(csv.DictReader(f))
 
-    def despachar_pedido(self, numero_pedido, empresa_transporte):
-        filas = []
-        actualizado = False
-        with open(self.archivo, mode='r', encoding='utf-8') as f:
+    def intentar_cancelar(self, num_pedido):
+        """Regla de Negocio: Solo cancela si NO ha sido enviada."""
+        filas, mensaje = [], "Orden no encontrada."
+        exito = False
+        with open(self.archivo, mode='r') as f:
             reader = csv.DictReader(f)
             fieldnames = reader.fieldnames
-            for row in reader:
-                if row['numero'] == str(numero_pedido):
-                    row['estado'] = "Enviado"
-                    row['transportadora'] = empresa_transporte
-                    actualizado = True
-                filas.append(row)
+            for r in reader:
+                if r['numero'] == str(num_pedido):
+                    if r['estado'] == "Enviado":
+                        mensaje = "Error: El pedido ya fue enviado y no puede cancelarse."
+                    else:
+                        r['estado'] = "Cancelada"
+                        exito = True
+                        mensaje = f"Orden {num_pedido} cancelada exitosamente."
+                filas.append(r)
         
-        if actualizado:
-            with open(self.archivo, mode='w', newline='', encoding='utf-8') as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(filas)
-        return actualizado
-
-# --- CLASES DE LÓGICA (TUS CLASES ORIGINALES) ---
-
-class InventarioExterno:
-    def __init__(self, archivo_csv="inventario_sistema.csv"):
-        self.archivo = archivo_csv
-
-    def consultar_detalles(self, codigo):
-        try:
-            with open(self.archivo, mode='r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    if int(row['codigo']) == codigo:
-                        return row
-        except FileNotFoundError: return None
-        return None
-
-    def actualizar_stock(self, codigo, cantidad):
-        filas, actualizado = [], False
-        with open(self.archivo, mode='r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            fieldnames = reader.fieldnames
-            for row in reader:
-                if int(row['codigo']) == codigo:
-                    stock_act = int(row['stock'])
-                    if stock_act >= cantidad:
-                        row['stock'] = str(stock_act - cantidad)
-                        actualizado = True
-                filas.append(row)
-        if actualizado:
-            with open(self.archivo, mode='w', newline='', encoding='utf-8') as f:
+        if exito:
+            with open(self.archivo, mode='w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader(); writer.writerows(filas)
-        return actualizado
+        return exito, mensaje
 
-class Cliente:
-    def __init__(self, nombre):
-        self.nombre = nombre
+    def despachar(self, num, transporte):
+        filas, ok = [], False
+        with open(self.archivo, mode='r') as f:
+            reader = csv.DictReader(f)
+            fieldnames = reader.fieldnames
+            for r in reader:
+                if r['numero'] == str(num) and r['estado'] == "Confirmada":
+                    r['estado'], r['transportadora'] = "Enviado", transporte
+                    ok = True
+                filas.append(r)
+        if ok:
+            with open(self.archivo, mode='w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader(); writer.writerows(filas)
+        return ok
 
-    def presentar_queja(self, motivo):
-        with open('quejas.csv', mode='a', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([self.nombre, motivo, datetime.datetime.now()])
-        print("Queja enviada al Gerente de Relaciones.")
-
-# --- MAIN CON 3 ROLES Y MENÚS ---
+# --- MAIN (FLUJO POR PERFILES) ---
 
 if __name__ == "__main__":
-    # Simulación de login simple para el video
-    print("=== TELEVENTAS LASALLE - LOGIN ===")
-    user = input("Usuario: ")
-    psw = input("Password: ")
-    
-    # Roles: 'Cliente', 'Agente', 'Gerente'
-    # (Para el video, asume que 'juan' es Cliente, 'pedro' es Agente, 'marta' es Gerente)
-    rol = ""
-    if user == "juan": rol = "Cliente"
-    elif user == "pedro": rol = "Agente"
-    elif user == "marta": rol = "Gerente"
+    print("=== TELEVENTAS LASALLE - SISTEMA V1.2 ===")
+    u_log, p_log = input("Usuario: "), input("Password: ")
+    usuario_act = UsuarioRepository.login(u_log, p_log)
 
-    if not rol:
-        print("Usuario no reconocido.")
+    if not usuario_act:
+        print("Credenciales inválidas.")
     else:
-        repo_pedidos = PedidoRepository()
-        inv = InventarioExterno()
-
-        if rol == "Cliente":
-            print(f"\n--- MENÚ CLIENTE ({user}) ---")
-            print("1. Realizar Compra\n2. Registrar Queja")
-            op = input("Seleccione: ")
-            if op == "1":
-                cod = int(input("ID Producto: "))
-                item = inv.consultar_detalles(cod)
-                if item:
-                    # Modelo matemático: T = p * q
-                    total = float(item['precio'])
-                    repo_pedidos.registrar_pedido(1001, user, total)
-                    print(f"Pedido #1001 generado por ${total}. Estado: Pendiente.")
-                else: print("Producto no encontrado.")
-            elif op == "2":
-                msg = input("Motivo de queja: ")
-                Cliente(user).presentar_queja(msg)
-
-        elif rol == "Agente":
-            print(f"\n--- MENÚ BODEGA ({user}) ---")
-            pendientes = repo_pedidos.obtener_pendientes()
-            if pendientes:
-                print("Pedidos para armar:")
-                for p in pendientes:
-                    print(f"ID: {p['numero']} | Cliente: {p['cliente']} | Total: {p['total']}")
+        print(f"\nSESIÓN INICIADA: {usuario_act.username} ({usuario_act.rol})")
+        repo_ped = PedidoRepository()
+        
+        while True:
+            # --- CLIENTE ---
+            if usuario_act.rol == "Cliente":
+                print("\n1. Comprar\n2. Gestionar Suscripción\n3. Cancelar Orden\n4. Salir")
+                op = input("Opción: ")
                 
-                id_despacho = input("\nIngrese ID para armar y despachar: ")
-                # Requerimiento: Seleccionar empresa de transporte
-                empresa = input("Seleccione Empresa de Transporte (Servientrega/Fedex): ")
+                if op == "2":
+                    print(f"Estado actual: {usuario_act.suscripcion}")
+                    sub_op = input("1. Suscribirse\n2. Cancelar Suscripción\nSeleccione: ")
+                    nuevo_est = "SI" if sub_op == "1" else "NO"
+                    if UsuarioRepository.cambiar_suscripcion(usuario_act.username, nuevo_est):
+                        usuario_act.suscripcion = nuevo_est # Actualizar objeto en memoria
+                        print(f"Suscripción actualizada a: {nuevo_est}")
                 
-                # Descontar stock (Requerimiento 3.2)
-                if inv.actualizar_stock(101, 1): # Ejemplo con prod 101
-                    repo_pedidos.despachar_pedido(id_despacho, empresa)
-                    print(f"Pedido {id_despacho} empaquetado y enviado vía {empresa}.")
-            else:
-                print("No hay pedidos pendientes.")
+                elif op == "3":
+                    num = input("Número de orden a cancelar: ")
+                    ok, msg = repo_ped.intentar_cancelar(num)
+                    print(msg)
+                
+                elif op == "4": break
 
-        elif rol == "Gerente":
-            print(f"\n--- PANEL GERENCIAL ---")
-            print("1. Ver Historial de Quejas\n2. Ver Todos los Pedidos")
-            # Aquí podrías leer los CSVs correspondientes
-            print("Mostrando reportes de trazabilidad...")
+            # --- AGENTE ---
+            elif usuario_act.rol == "Agente":
+                print("\n1. Ver Pendientes\n2. Despachar\n3. Salir")
+                op = input("Opción: ")
+                if op == "2":
+                    num = input("ID Pedido: ")
+                    trans = input("Transportadora (Servientrega/Envia/Fedex): ")
+                    if repo_ped.despachar(num, trans):
+                        print("Pedido enviado. Ya no podrá ser cancelado por el cliente.")
+                elif op == "3": break
+            
+            elif usuario_act.rol == "Gerente": break

@@ -1,0 +1,4 @@
+username,password,rol,email,suscripcion
+juan_cliente,pass123,Cliente,juan@correo.com,NO
+pedro_agente,bodega123,Agente,pedro@correo.com,NO
+marta_gerente,admin123,Gerente,marta@correo.com,NO
