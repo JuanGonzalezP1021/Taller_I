@@ -1,57 +1,33 @@
 # Manual de Programación: Ejercicio 1 - TeleVentas
 
 ## 1.Requerimientos Funcionales 
-
-Gestión del Catálogo: El sistema debe permitir consultar información detallada de productos, incluyendo código, descripción, precio y cantidad disponible.
-
-
-Suscripción Informativa: Los clientes deben poder solicitar el envío periódico del catálogo a través de su correo electrónico.
-
-
-Gestión de Órdenes: * Ingreso de órdenes de compra para un conjunto de productos.
-
-Cancelación de órdenes existentes.
-
-
-Gestión de Quejas: Registro de quejas por parte de los clientes (ej. demoras en entregas).
-
-Operaciones de Depósito (Bodega):
-
-Consulta de órdenes confirmadas para el armado y empaquetado de productos.
-
-Determinación de la logística de entrega para cada pedido armado.
-
-Selección de la empresa de transporte y delegación de la entrega.
+## 1. Requerimientos Funcionales 
+* **Gestión del Catálogo:** Consulta de código, descripción, precio y stock.
+* **Suscripción Informativa:** Envío de catálogo por correo electrónico.
+* **Gestión de Órdenes:** Ingreso y cancelación de pedidos.
+* **Gestión de Quejas:** Registro y remisión inmediata al gerente.
+* **Operaciones de Depósito:** Armado, empaquetado y selección de logística de entrega.
 
 ## 2. Reglas de Negocio
-
-Restricción de Pago: Actualmente, el sistema solo debe admitir tarjeta de crédito como tipo de pago.
-
-
-Flujo de Quejas: Las quejas recibidas deben remitirse de forma inmediata al gerente de relaciones de la empresa.
+* **Restricción de Pago:** Únicamente se admite Tarjeta de Crédito.
+* **Flujo de Quejas:** Envío automático al Gerente de Relaciones.
 
 ## 3. Integración y Restricciones Técnicas
-
-Sistema Preexistente: El nuevo software debe interactuar obligatoriamente con un sistema de inventario que ya posee la empresa.
-
-Intercambio de Datos:
-
-Consultar descripción y precio al momento de tomar la orden.
-
-Actualizar la disponibilidad (stock) de productos al momento de armar los pedidos.
+* **Sistema Preexistente:** Interacción obligatoria con el inventario de la empresa.
+* **Persistencia:** El intercambio de datos se realiza mediante un archivo `inventario.csv` que actúa como base de datos externa.
 
 ## 4. Modelado Matemático
-El cálculo del valor total de un pedido ($T$) se define como la sumatoria del producto entre el precio ($p$) y la cantidad ($q$) de cada ítem:
+Cálculo del valor total ($T$):
 $$T = \sum_{i=1}^{n} (p_i \times q_i)$$
 
-La actualización del inventario sigue la lógica de sustracción simple:
+Actualización de inventario:
 $$S_{final} = S_{inicial} - q_{despachado}$$
 
 ## 5. Diagrama de Clases (UML)
 ```mermaid
 classDiagram
     class InventarioExterno {
-        <<System>>
+        -string archivo_csv
         +consultarDetalles(codigo) Producto
         +actualizarStock(codigo, cantidad) bool
     }
@@ -61,46 +37,33 @@ classDiagram
         -string descripcion
         -float precio
         -int cantidadDisponible
-        +obtenerInfo() string
     }
 
     class Cliente {
-        -string id
-        -string nombre
         -string email
-        +consultarCatalogo()
         +solicitarCatalogoEmail()
-        +ingresarOrden(listaProductos)
-        +cancelarOrden(idOrden)
+        +ingresarOrden()
         +presentarQueja(motivo)
     }
 
     class OrdenCompra {
         -int numero
-        -date fecha
-        -float montoTotal
         -string tipoPago = "Tarjeta de Crédito"
         -string estado
         +confirmar()
-        +cancelar()
     }
 
     class AgenteDeposito {
-        +consultarOrdenesConfirmadas()
         +armarPedido(idOrden)
-        +empaquetar(idOrden)
     }
 
     class Logistica {
         -string empresaTransporte
-        +seleccionarTransporte()
         +delegarEntrega(idPedido)
     }
 
     class Queja {
-        -int idQueja
         -string motivo
-        -date fecha
         +remitirGerente()
     }
 
@@ -108,18 +71,20 @@ classDiagram
         +recibirQueja(queja)
     }
 
-    Cliente "1" -- "*" OrdenCompra : realiza
-    OrdenCompra "*" -- "*" Producto : contiene
-    OrdenCompra ..> InventarioExterno : consulta/actualiza
-    AgenteDeposito ..> OrdenCompra : procesa
-    AgenteDeposito --> Logistica : determina
-    Cliente "1" -- "*" Queja : interpone
-    Queja ..> GerenteRelaciones : se remite a
+    Cliente "1" -- "*" OrdenCompra
+    OrdenCompra "*" -- "*" Producto
+    OrdenCompra ..> InventarioExterno : usa CSV
+    AgenteDeposito ..> InventarioExterno : actualiza CSV
+    AgenteDeposito --> Logistica
+    Cliente "1" -- "*" Queja
+    Queja ..> GerenteRelaciones
+
 ```
 
 
-
 ## 6 Justificación del Diseño según Requerimientos
+
+El diseño utiliza una arquitectura desacoplada donde la clase InventarioExterno encapsula toda la lógica de lectura/escritura del archivo CSV. Esto permite que el resto del sistema (como la clase OrdenCompra) trabaje con objetos de tipo Producto sin preocuparse por el formato del archivo externo, cumpliendo con el principio de Responsabilidad Única
 
 Clase Producto: Incluye los atributos obligatorios: código, descripción, precio y cantidad disponible.
 
@@ -136,7 +101,9 @@ Flujo de Depósito y Logística: Se incluyen las clases AgenteDeposito y Logisti
 Gestión de Quejas: Se implementa la clase Queja con un método de remisión inmediata al GerenteRelaciones, tal como lo exige el flujo del negocio.
 
 
-Acciones del Cliente: Se han mapeado todos los métodos solicitados: consulta de catálogo, solicitud por email, ingreso/cancelación de órdenes y presentación de quejas .
+Acciones del Cliente: Se han mapeado todos los métodos solicitados: consulta de catálogo, solicitud por email, ingreso/cancelación de órdenes y presentación de quejas.
+
+
 
 ## 7. Estándares de Calidad:
 Aplicación de principios S.O.L.I.D.
