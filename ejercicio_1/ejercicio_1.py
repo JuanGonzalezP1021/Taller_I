@@ -2,6 +2,13 @@ import csv
 import datetime
 import os
 
+# Configuración de rutas dinámicas para asegurar que el sistema trabaje dentro de la carpeta del script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def get_path(filename):
+    """Construye la ruta absoluta para los archivos de datos dentro de la carpeta del ejercicio."""
+    return os.path.join(BASE_DIR, filename)
+
 # =============================================================================
 # 1. CAPA DE SEGURIDAD Y MODELADO (ENCAPSULAMIENTO)
 # =============================================================================
@@ -13,7 +20,7 @@ class Usuario:
     """
     def __init__(self, username, password, rol, email, suscripcion="NO"):
         self.username = username
-        self.__password = password  # Atributo Privado
+        self.__password = password  # Atributo Privado (Encapsulamiento)
         self.rol = rol
         self.email = email
         self.suscripcion = suscripcion
@@ -28,21 +35,24 @@ class Usuario:
 
 class UsuarioRepository:
     """Gestiona el acceso y modificación del archivo usuarios.csv"""
-    FILE = 'usuarios.csv'
+    FILE = get_path('usuarios.csv')
 
     @classmethod
     def inicializar(cls):
+        """Crea el archivo con datos base solo si no existe físicamente."""
         if not os.path.exists(cls.FILE):
             with open(cls.FILE, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=['username', 'password', 'rol', 'email', 'suscripcion'])
                 writer.writeheader()
-                # Usuarios por defecto para pruebas
-                writer.writerow({'username': 'juan_cliente', 'password': '123', 'rol': 'Cliente', 'email': 'juan@mail.com', 'suscripcion': 'NO'})
-                writer.writerow({'username': 'pedro_agente', 'password': '456', 'rol': 'Agente', 'email': 'pedro@mail.com', 'suscripcion': 'NO'})
-                writer.writerow({'username': 'marta_gerente', 'password': '789', 'rol': 'Gerente', 'email': 'marta@mail.com', 'suscripcion': 'NO'})
+                writer.writerows([
+                    {'username': 'juan_cliente', 'password': '123', 'rol': 'Cliente', 'email': 'juan@mail.com', 'suscripcion': 'NO'},
+                    {'username': 'pedro_agente', 'password': '456', 'rol': 'Agente', 'email': 'pedro@mail.com', 'suscripcion': 'NO'},
+                    {'username': 'marta_gerente', 'password': '789', 'rol': 'Gerente', 'email': 'marta@mail.com', 'suscripcion': 'NO'}
+                ])
 
     @classmethod
     def buscar(cls, username):
+        if not os.path.exists(cls.FILE): cls.inicializar()
         with open(cls.FILE, 'r', encoding='utf-8') as f:
             for row in csv.DictReader(f):
                 if row['username'] == username:
@@ -69,7 +79,7 @@ class UsuarioRepository:
 
 class InventarioRepository:
     """Gestiona el sistema de stock externo (inventario_sistema.csv)"""
-    FILE = 'inventario_sistema.csv'
+    FILE = get_path('inventario_sistema.csv')
 
     @classmethod
     def inicializar(cls):
@@ -77,11 +87,14 @@ class InventarioRepository:
             with open(cls.FILE, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=['codigo', 'descripcion', 'precio', 'stock'])
                 writer.writeheader()
-                writer.writerow({'codigo': '101', 'descripcion': 'Televisor 50"', 'precio': '1500.0', 'stock': '10'})
-                writer.writerow({'codigo': '102', 'descripcion': 'Audífonos BT', 'precio': '80.0', 'stock': '50'})
-                writer.writerow({'codigo': '103', 'descripcion': 'Consola Gaming', 'precio': '500.0', 'stock': '5'})
+                writer.writerows([
+                    {'codigo': '101', 'descripcion': 'Televisor 50" UHD', 'precio': '1500.0', 'stock': '10'},
+                    {'codigo': '102', 'descripcion': 'Audífonos BT', 'precio': '80.0', 'stock': '50'},
+                    {'codigo': '103', 'descripcion': 'Consola Gaming', 'precio': '500.0', 'stock': '5'}
+                ])
 
     def listar_todo(self):
+        if not os.path.exists(self.FILE): self.inicializar()
         with open(self.FILE, 'r', encoding='utf-8') as f:
             return list(csv.DictReader(f))
 
@@ -111,7 +124,7 @@ class InventarioRepository:
 
 class PedidoRepository:
     """Gestiona las órdenes de compra (pedidos.csv)"""
-    FILE = 'pedidos.csv'
+    FILE = get_path('pedidos.csv')
 
     @classmethod
     def inicializar(cls):
@@ -121,6 +134,7 @@ class PedidoRepository:
                 writer.writeheader()
 
     def registrar(self, cliente, total):
+        if not os.path.exists(self.FILE): self.inicializar()
         ped_id = datetime.datetime.now().strftime("%S%f")[:4]
         with open(self.FILE, 'a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
@@ -128,10 +142,12 @@ class PedidoRepository:
         return ped_id
 
     def listar_todos(self):
+        if not os.path.exists(self.FILE): self.inicializar()
         with open(self.FILE, 'r', encoding='utf-8') as f:
             return list(csv.DictReader(f))
 
     def cancelar(self, ped_id, cliente):
+        """Solo permite cancelar si el estado no es 'Enviado'."""
         filas, msg, exito = [], "Pedido no encontrado.", False
         with open(self.FILE, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
@@ -139,7 +155,7 @@ class PedidoRepository:
             for r in reader:
                 if r['id'] == str(ped_id) and r['cliente'] == cliente:
                     if r['estado'] == 'Enviado':
-                        msg = "Error: El pedido ya fue enviado y no puede cancelarse."
+                        msg = "ERROR: El pedido ya fue enviado y no puede cancelarse."
                     else:
                         r['estado'] = 'Cancelada'
                         exito = True
@@ -169,7 +185,7 @@ class PedidoRepository:
 
 class QuejaRepository:
     """Gestiona el buzón de quejas (quejas.csv)"""
-    FILE = 'quejas.csv'
+    FILE = get_path('quejas.csv')
 
     @classmethod
     def inicializar(cls):
@@ -179,6 +195,7 @@ class QuejaRepository:
                 writer.writerow(['cliente', 'motivo', 'fecha'])
 
     def registrar(self, cliente, motivo):
+        if not os.path.exists(self.FILE): self.inicializar()
         fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         with open(self.FILE, 'a', newline='', encoding='utf-8') as f:
             csv.writer(f).writerow([cliente, motivo, fecha])
@@ -193,9 +210,9 @@ def menu_cliente(usuario):
     while True:
         print(f"\n--- MENÚ CLIENTE ({usuario.username}) ---")
         print("1. Consultar Catálogo")
-        print("2. Suscribirse/Cancelar Suscripción Catálogo")
-        print("3. Realizar Orden de Compra (Tarjeta de Crédito)")
-        print("4. Cancelar Orden de Compra")
+        print("2. Suscribirse/Cancelar Suscripción")
+        print("3. Comprar Producto (Cargo a Tarjeta)")
+        print("4. Cancelar Orden")
         print("5. Presentar Queja")
         print("6. Salir")
         op = input("Opción: ")
@@ -212,21 +229,20 @@ def menu_cliente(usuario):
                 print(f"Suscripción actualizada a: {nuevo}")
 
         elif op == "3":
-            cod = input("ID del producto a comprar: ")
+            cod = input("ID del producto: ")
             prod = repo_inv.consultar(cod)
             if prod:
                 pid = repo_ped.registrar(usuario.username, prod['precio'])
-                print(f"Orden #{pid} generada. El cargo se realizará a su TARJETA registrada.")
+                print(f"Orden #{pid} generada. Cargo automático realizado a su TARJETA.")
             else: print("Error: Producto no encontrado.")
 
         elif op == "4":
-            pid = input("ID de la orden a cancelar: ")
+            pid = input("ID de la orden: ")
             print(repo_ped.cancelar(pid, usuario.username))
 
         elif op == "5":
-            motivo = input("Motivo de la queja: ")
-            QuejaRepository().registrar(usuario.username, motivo)
-            print("Queja enviada inmediatamente al Gerente.")
+            QuejaRepository().registrar(usuario.username, input("Motivo: "))
+            print("Queja remitida al Gerente.")
 
         elif op == "6": break
 
@@ -234,9 +250,9 @@ def menu_agente(usuario):
     repo_ped = PedidoRepository()
     repo_inv = InventarioRepository()
     while True:
-        print(f"\n--- MENÚ AGENTE ({usuario.username}) ---")
-        print("1. Listar Órdenes Confirmadas")
-        print("2. Despachar Pedido (Logística)")
+        print(f"\n--- PANEL AGENTE ({usuario.username}) ---")
+        print("1. Ver Órdenes Confirmadas")
+        print("2. Despachar Pedido (Selección Logística)")
         print("3. Salir")
         op = input("Opción: ")
 
@@ -245,52 +261,58 @@ def menu_agente(usuario):
                 if p['estado'] == 'Confirmada': print(p)
 
         elif op == "2":
-            pid = input("ID del pedido para armar: ")
-            transporte = {"1":"Servientrega", "2":"Envia", "3":"Fedex"}.get(input("Transportadora (1.Servientrega, 2.Envia, 3.Fedex): "), "N/A")
-            # En un sistema real, aquí buscaríamos el producto asociado al pedido para descontar stock
-            if repo_inv.descontar_stock(101, 1): # Simulación lógica de descuento
-                if repo_ped.despachar(pid, transporte):
-                    print(f"Pedido #{pid} empaquetado y enviado vía {transporte}.")
-                else: print("Error al actualizar pedido.")
-            else: print("Error: Stock insuficiente.")
+            pid = input("ID del pedido: ")
+            print("Seleccione Logística: 1.Servientrega 2.Envia 3.Fedex")
+            trans = {"1":"Servientrega", "2":"Envia", "3":"Fedex"}.get(input("Opción: "), "N/A")
+            # Actualización de stock basada en el primer producto por simplicidad del ejercicio
+            if repo_inv.descontar_stock(101, 1): 
+                if repo_ped.despachar(pid, trans):
+                    print(f"Pedido {pid} enviado vía {trans}.")
+                else: print("No se pudo actualizar el pedido.")
+            else: print("Error de stock.")
 
         elif op == "3": break
 
 def menu_gerente(usuario):
     while True:
-        print(f"\n--- PANEL SUPER USUARIO (GERENTE: {usuario.username}) ---")
+        print(f"\n--- PANEL GERENCIAL (SUPER USUARIO: {usuario.username}) ---")
         print("1. Ver Inventario Completo")
-        print("2. Ver Historial Logístico de Pedidos")
+        print("2. Ver Historial de Pedidos")
         print("3. Ver Buzón de Quejas")
         print("4. Salir")
         op = input("Opción: ")
 
         if op == "1":
-            with open('inventario_sistema.csv', 'r') as f: print(f.read())
+            with open(InventarioRepository.FILE, 'r', encoding='utf-8') as f: print(f.read())
         elif op == "2":
-            with open('pedidos.csv', 'r') as f: print(f.read())
+            with open(PedidoRepository.FILE, 'r', encoding='utf-8') as f: print(f.read())
         elif op == "3":
-            with open('quejas.csv', 'r') as f: print(f.read())
+            if os.path.exists(QuejaRepository.FILE):
+                with open(QuejaRepository.FILE, 'r', encoding='utf-8') as f: print(f.read())
         elif op == "4": break
 
 def main():
-    # Inicializar base de datos CSV
-    UsuarioRepository.inicializar()
-    InventarioRepository.inicializar()
-    PedidoRepository.inicializar()
-    QuejaRepository.inicializar()
+    try:
+        # Los métodos de inicialización solo crearán archivos si NO los detectan en la carpeta
+        UsuarioRepository.inicializar()
+        InventarioRepository.inicializar()
+        PedidoRepository.inicializar()
+        QuejaRepository.inicializar()
 
-    print("=== TELEVENTAS LASALLE - SISTEMA INTEGRAL ===")
-    user = input("Usuario: ")
-    psw = input("Contraseña: ")
+        print("=== TELEVENTAS LASALLE - SISTEMA INTEGRAL ===")
+        user = input("Usuario: ")
+        psw = input("Contraseña: ")
 
-    usuario = UsuarioRepository.buscar(user)
-    if usuario and usuario.validar_acceso(psw):
-        if usuario.rol == "Cliente": menu_cliente(usuario)
-        elif usuario.rol == "Agente": menu_agente(usuario)
-        elif usuario.rol == "Gerente": menu_gerente(usuario)
-    else:
-        print("Credenciales inválidas.")
+        u = UsuarioRepository.buscar(user)
+        if u and u.validar_acceso(psw):
+            print(f"\nAcceso como: {u.rol}")
+            if u.rol == "Cliente": menu_cliente(u)
+            elif u.rol == "Agente": menu_agente(u)
+            elif u.rol == "Gerente": menu_gerente(u)
+        else:
+            print("Credenciales inválidas.")
+    except Exception as e:
+        print(f"Error crítico: {e}")
 
 if __name__ == "__main__":
     main()
