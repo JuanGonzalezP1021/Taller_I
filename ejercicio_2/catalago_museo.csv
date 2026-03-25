@@ -1,6 +1,5 @@
-titulo,autor,valor,f_entrada,tipo,detalle,estilo
-La persistencia de la memoria,Salvador Dali,500000,2018-05-20,Cuadro,Oleo,Surrealismo
-El Pensador,Auguste Rodin,350000,2022-11-15,Escultura,Bronce,Impresionismo
-La noche estrellada,Vincent van Gogh,900000,2019-03-10,Cuadro,Oleo,Postimpresionismo
-David de Miguel Angel,Miguel Angel,1200000,2010-01-01,Escultura,Marmol,Renacimiento
-Guernica,Pablo Picasso,850000,2024-02-28,Cuadro,Oleo,Cubismo
+id,titulo,autor,valor,f_entrada,tipo,detalle,estilo,estado
+1,La Noche Estrellada,Van Gogh,1000000.0,2018-01-01,Cuadro,Oleo,Post-impresionismo,Expuesta
+2,El Pensador,Rodin,500000.0,2020-05-15,Escultura,Bronce,Moderna,Expuesta
+3,La Piedad,Miguel Angel,800000.0,2023-11-20,Escultura,Marmol,Renacimiento,Expuesta
+4,Guernica,Picasso,2500000.0,2015-06-10,Cuadro,Oleo,Cubismo,Expuesta
