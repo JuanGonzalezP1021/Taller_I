@@ -1,20 +1,34 @@
 # Manual de Programación: Ejercicio 1 - TeleVentas
 
-## 1.Requerimientos Funcionales 
-## 1. Requerimientos Funcionales 
-* **Gestión del Catálogo:** Consulta de código, descripción, precio y stock.
-* **Suscripción Informativa:** Envío de catálogo por correo electrónico.
-* **Gestión de Órdenes:** Ingreso y cancelación de pedidos.
-* **Gestión de Quejas:** Registro y remisión inmediata al gerente.
-* **Operaciones de Depósito:** Armado, empaquetado y selección de logística de entrega.
+## 1. Requerimientos Funcionales
+
+Gestión del Catálogo: Consulta de información técnica (código, descripción, precio, stock) desde un sistema externo.
+
+Suscripción Informativa: Gestión de alta y baja de suscripción para envío de catálogo por email.
+
+Gestión de Órdenes: Ingreso de pedidos con cargo automático a tarjeta y cancelación sujeta a estado logístico.
+
+Gestión de Quejas: Registro por parte del cliente y remisión inmediata para auditoría gerencial.
+
+Operaciones de Depósito: Armado de pedidos, actualización de stock y selección de logística de transporte por parte del Agente.
+
+Supervisión Gerencial (Super Usuario): Acceso total e irrestricto a la visualización de inventarios, historial de pedidos con su logística y buzón de quejas para la toma de decisiones.
 
 ## 2. Reglas de Negocio
-* **Restricción de Pago:** Únicamente se admite Tarjeta de Crédito.
-* **Flujo de Quejas:** Envío automático al Gerente de Relaciones.
+
+Restricción de Pago: Únicamente se admite Tarjeta de Crédito (cargo automático a la tarjeta registrada).
+
+Validación de Cancelación: Solo se permiten cancelaciones si el pedido no ha sido marcado como "Enviado".
+
+Seguridad Obligatoria: Todos los usuarios deben autenticarse; el acceso a funciones depende del rol asignado (Cliente, Agente o Gerente).
 
 ## 3. Integración y Restricciones Técnicas
-* **Sistema Preexistente:** Interacción obligatoria con el inventario de la empresa.
-* **Persistencia:** El intercambio de datos se realiza mediante un archivo `inventario.csv` que actúa como base de datos externa.
+
+Sistema Preexistente: Interacción obligatoria con un archivo inventario_sistema.csv.
+
+Persistencia Integral: Uso de 4 archivos CSV (usuarios.csv, inventario_sistema.csv, pedidos.csv, quejas.csv) para garantizar la trazabilidad.
+
+Encapsulamiento: Las credenciales se manejan como atributos privados en la clase Usuario.
 
 ## 4. Modelado Matemático
 Cálculo del valor total ($T$):
@@ -26,80 +40,77 @@ $$S_{final} = S_{inicial} - q_{despachado}$$
 ## 5. Diagrama de Clases (UML)
 ```mermaid
 classDiagram
-    class InventarioExterno {
-        -string archivo_csv
-        +consultarDetalles(codigo) Producto
-        +actualizarStock(codigo, cantidad) bool
+    class Usuario {
+        -string username
+        -string __password
+        -string rol
+        +validarPassword(psw) bool
     }
 
-    class Producto {
-        -int codigo
-        -string descripcion
-        -float precio
-        -int cantidadDisponible
+    class UsuarioRepository {
+        +login(user, psw) Usuario
+        +cambiarSuscripcion(user, estado) bool
+    }
+
+    class InventarioRepository {
+        +consultar(codigo) dict
+        +actualizarStock(codigo, cantidad) bool
+        +obtenerTodo() list
+    }
+
+    class PedidoRepository {
+        +crear(num, cliente, total)
+        +intentarCancelar(num) bool
+        +despachar(num, transporte) bool
+        +listarTodos() list
     }
 
     class Cliente {
-        -string email
-        +solicitarCatalogoEmail()
-        +ingresarOrden()
-        +presentarQueja(motivo)
-    }
-
-    class OrdenCompra {
-        -int numero
-        -string tipoPago = "Tarjeta de Crédito"
-        -string estado
-        +confirmar()
+        +comprar()
+        +gestionarSuscripcion()
+        +cancelarOrden()
+        +presentarQueja()
     }
 
     class AgenteDeposito {
-        +armarPedido(idOrden)
+        +seleccionarLogistica()
+        +armarPedido()
     }
 
-    class Logistica {
-        -string empresaTransporte
-        +delegarEntrega(idPedido)
+    class GerenteRelaciones {
+        +consultarInventario()
+        +auditarPedidos()
+        +revisarQuejas()
     }
 
-    class Queja {
-        -string motivo
-        +remitirGerente()
-    }
-
-
-    Cliente "1" -- "*" OrdenCompra
-    OrdenCompra "*" -- "*" Producto
-    OrdenCompra ..> InventarioExterno : usa CSV
-    AgenteDeposito ..> InventarioExterno : actualiza CSV
-    AgenteDeposito --> Logistica
-    Cliente "1" -- "*" Queja
-    Queja ..> CSV : persiste en quejas.csv
+    UsuarioRepository ..> Usuario : gestiona
+    Cliente ..> PedidoRepository : interactúa
+    AgenteDeposito ..> InventarioRepository : actualiza stock
+    AgenteDeposito ..> PedidoRepository : cambia estado
+    GerenteRelaciones ..> InventarioRepository : supervisa
+    GerenteRelaciones ..> PedidoRepository : audita
+    GerenteRelaciones ..> CSV : lee quejas.csv
+    PedidoRepository ..> CSV : pedidos.csv
+    InventarioRepository ..> CSV : inventario_sistema.csv
 
 ```
 
 
 ## 6 Justificación del Diseño según Requerimientos
 
-El diseño utiliza una arquitectura desacoplada donde la clase InventarioExterno encapsula toda la lógica de lectura/escritura del archivo CSV. Esto permite que el resto del sistema (como la clase OrdenCompra) trabaje con objetos de tipo Producto sin preocuparse por el formato del archivo externo, cumpliendo con el principio de Responsabilidad Única
+El diseño arquitectónico se ha estructurado para responder de manera exacta a las necesidades de TeleVentas, basándose en los siguientes pilares:
 
-Clase Producto: Incluye los atributos obligatorios: código, descripción, precio y cantidad disponible.
+Interacción con Sistemas Preexistentes: Mediante el Patrón Repository, se garantiza que el sistema web pueda consultar y actualizar el inventario de la empresa sin acoplar la lógica de negocio al formato físico de los datos.
 
+Gestión de Órdenes y Pagos: Se implementó una lógica de control que automatiza el flujo de compra. El sistema procesa el requerimiento ajustándose a la política financiera de la empresa (actualmente la tarjeta de crédito es la única opción de pago disponible).
 
-Interfaz con InventarioExterno: Se modela como una entidad separada con la que el sistema debe interactuar para validar precios y actualizar el stock al armar los pedidos.
+Integración Logística: El diseño provee soporte directo a los Agentes de Depósito para la toma de decisiones, facilitando la selección de la empresa de transporte y asegurando que el estado del pedido cambie a "Enviado" solo tras validar el inventario.
 
+Rol de Super Usuario (Gerente): Se ha diseñado un perfil de Gerente de Relaciones con privilegios elevados. Este rol actúa como un monitor central del sistema, con capacidad de leer todos los repositorios (Inventario, Pedidos y Quejas). Esta centralización permite una auditoría completa del ciclo de vida de la orden y una respuesta inmediata a las incidencias reportadas por los clientes.
 
-Restricción de Pago: La clase OrdenCompra tiene predefinido el atributo tipoPago como "Tarjeta de Crédito", cumpliendo con la limitación actual del sistema.
+Seguridad y Encapsulamiento: Cumpliendo con la restricción técnica de autenticación, se utiliza Encapsulamiento para proteger la información sensible. El uso de atributos privados (__password) asegura que las credenciales no sean accesibles fuera de los métodos de validación.
 
-
-Flujo de Depósito y Logística: Se incluyen las clases AgenteDeposito y Logistica para cubrir las tareas de armado, empaquetado y selección de la empresa de transporte.
-
-
-Gestión de Quejas: Se implementa la clase Queja con un método de remisión inmediata al GerenteRelaciones, tal como lo exige el flujo del negocio.
-
-
-Acciones del Cliente: Se han mapeado todos los métodos solicitados: consulta de catálogo, solicitud por email, ingreso/cancelación de órdenes y presentación de quejas.
-
+Control de Estados: La lógica de cancelación está blindada por una regla de negocio que verifica el estado logístico, impidiendo anulaciones de órdenes ya delegadas a transporte.
 
 
 ## 7. Estándares de Calidad:
